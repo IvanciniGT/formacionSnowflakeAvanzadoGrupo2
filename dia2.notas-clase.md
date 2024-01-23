@@ -158,3 +158,18 @@ En este caso, SF puede leer los datos de cada fichero... y ordenarlos entre si..
   Para snowflake todo es la misma mierda. Solo mantiene esas palabras para facilitar la compatibilidad de los scripts con BBDD externas. 
   Si le pongo restricciones de longitud, SF pasa de ellas 3 pueblos.
     - OJO: Igual que con las restricciones de integridad referencial, si conozco las longitudes de los campos, se los pondré... por aquello de facilitar a TERCERAS HERRAMIENTAS que puedan usar esa información.
+  
+
+---
+
+BBDD ventas de los años 2001, 2002, 2003, 2004
+y más o menos la misma cantidad de ventas por año
+
+Tengo una query que filtra los datos del 2001.
+
+Mejorar el tiempo de lectura de la BBDD
+- Mejorar el clustering
+- Más máquinas leyendo más ficheros en paralelo. -> 10 máquina
+  - CUIDADO, la cantidad de trabajo que haré será el mismo.... pero lo hago más rápido.
+  - ESTO AHORRA PASTA? NO... de hecho encarece
+- Leyendo solo las columnas que me interesan: SELECT * = DESASTRE!
