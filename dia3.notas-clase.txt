@@ -1,0 +1,341 @@
+
+---
+
+BBDD ventas de los años 2001, 2002, 2003, 2004
+y más o menos la misma cantidad de ventas por año
+
+Tengo una query que filtra los datos del 2001.
+
+Mejorar el tiempo de lectura de la BBDD
+- Mejorar el clustering
+- Más máquinas leyendo más ficheros en paralelo. -> 10 máquina
+  - CUIDADO, la cantidad de trabajo que haré será el mismo.... pero lo hago más rápido.
+  - ESTO AHORRA PASTA? NO... de hecho encarece
+- Leyendo solo las columnas que me interesan: SELECT * = DESASTRE!
+
+
+Si un proceso en una máquina de 1 crédito/hora tarda 8 segundos
+Y el mismo proceso en una máquinas de 8 créditos/hora tarda 1 segundo
+
+A mi me cobran por tiempo de uso... Si el tiempo de uso es proporcional al incremento de precio, pago lo mismo en los 2 casos.
+
+El tema es que al subir el precio, la velocidad de procesamiento no sube proporcionalmente.
+Me interesa ajustar bien el tamaño de warehouse que voy a usar. Tengo que llegar a un compromiso:
+- Tiempo
+- Pasta
+El tiempo casi siempre es el factor limitante:
+- Por las noches (5-6 horas donde lo puedo ejecutar)
+- El informe tiene que ser en tiempo real
+- Estoy generando un cuadro  de mando que se actualiza cada hora
+Me interesa tomar el warehouse mínimo que me garantice ese tiempo que necesito... Prueba y error
+
+Mi tiempo vale mucha pasta
+
+
+4:42
+6:15
+5:43
+4:42
+
+-----> De media 320 segundos
+A mi me ha tardado 105
+
+
+Me ha tardado un 33% de lo que has tardado a vosotros.
+A vosotros os ha tardado un 300% de lo que me ha tardado a mi.
+Pero yo he pagado un 400% de lo que habéis pagado vosotros... Yo 4 créditos / hora ... vosotros a 1.
+
+
+Si yo tengo una computadora conectada a red... leyendo archivos... y procesándolos:
+¿Qué es lo que limita la velocidad de procesamiento? El tiempo que tarda el nodo en ejecutarse
+- Warehouse... Cuanto más grande, más memoria y cpu 
+  - Cuánto tardo en procesar los datos 
+  - Cuántos procesos paralelos puedo tener leyendo datos
+
+Con una máquina que tenga una CPU más potente, los datos tardan menos en procesarse... Son prácticamente iguales
+Con una máquina que tenga más CPUs, más procesos puedo lanzar en PARALELO leyendo ficheros
+
+Siempre y cuando qué? Siempre y cuando los datos sean exportables (leibles) a esa velocidad
+
+
+CAPA DE PROCESAMIENTO
+    Máquinas que contrato para procesar, leen de esas carpetas compartidas en red
+
+CAPA DE ALMACENAMIENTO
+    Volúmenes compartidos en RED
+
+En un momento dado, por más cpus que tenga.. y procesos de lectura de ficheros que se levanten en Snowflake
+el volumen de almacenamiento no va a dar más rendimiento... y hay un punto en el que el número de cpus que tenga ya da igual.
+
+Puede haber otro cuello de botella: LA RED
+
+---
+
+# Para mejorar el tiempo de lectura:
+- Leer las columnas adecuadas. Si puedo optimizar esto, ahorro tiempo y pasta
+  - Si no estoy usando rollos raros de SELECT * y cosas así, raro es que pueda mejorar aquí
+- Tener un mejor particionamiento (clustering) de la tabla. Si puedo optimizar esto, ahorro tiempo y pasta
+   Tiro una query y yo puedo precalcular el · de datos aue se ven afectados por esa query:
+    select count(*) que cumplan la condición
+    / 
+    select count(*) de mi tabla
+- Poner más máquinas:
+  - Hay un límite...la velocidad de lectura en red / volumen de almacenamiento
+  - A más máquinas... mientras tenga sentido ^^^, ahorro tiempo, pero pago más pasta
+
+        snowflake trata de tener particiones de un tamaño en torno a 15Gbs
+
+        200000 datos
+
+
+        1.000.000.000
+        Al partir por fechas.. si tienes 10 años de registros:
+        100.000.000 al año / 365 días = 273.972 registros al día si meto el call center y tengo 20 call centers = 13.698 registros al día por call center
+
+        ---
+        SOY FACEBOOK!
+        Tengo la tabla de clientes: 1.500.000.000
+        Los reparto por países: 100 países -> 15.000.000
+        Ahora por sexo...
+        Y también por franja de edad
+
+        15.000.000 / 2 / 10 = 750.000 / 7 = 107.142 por fichero
+
+        Si al final uso solo el país para las queries, lo que estoy haciendo es meter una sobrecarga enorme de optimación de las micro-particiones para nada.
+
+# Tenemos un nodo de agrupación que queremos optimizar
+
+En una BBDD relacional, tirando de indices, se podrían haber sacado los datos ya ordenados para que la agrupación se haga más rápida
+
+
+Para calcular una suma:
+    A   1
+    A   3   
+    B   6   
+    C   2
+    A   4
+    B   1
+    C   3
+
+Suma del numerito agrupado por la letra:
+    A   1
+    A   3
+    A   4 -> 8
+    B   6
+    B   1 -> 7
+    C   2
+    C   3 -> 5
+
+Este cálculo lo podríamos tener precalculado en Snowflake, creando una vista materializada.
+Eso va a tener bastantes impactos positivos:
+- El cálculo solo lo hago pocas veces... frente a la cantidad de veces que lo voy a usar? o no?
+  - Si el cálculo no puedo reaprovecharlo... no me interesa
+  - Si lo uso pocas veces... y lo tengo que tengo que refrescar con frecuencia... no me interesa
+ Si me interesase, ese 17% de trabajo que se lleva el nodo, lo hago de cuando en cuando... pero lo evito muchas veces
+- YA no tengo que leer los 3.4G de registros = 3.400.000.000 registros -> 76% del tiempo = 18Gbs de datos
+  - En su lugar leo solamente: 2.500.000 registros -> TARDARA UN HUEVON MENOS QUE LO OTRO
+Podría ser una solución ideal... siempre y cuando lo usemos muchas veces... y no lo tengamos que refrescar muy a menudo.
+
+---
+
+## CASO FERNANDO:
+
+- Vista ventas mensuales: 1M de registros
+   UNION ALL
+- Vista de presupuestos mensuales: 1M de registros
+
+---
+
+# Snowflake y las vistas materializadas
+
+Una vista materializada es un conjunto de datos precalculados, derivados de una consulya y que se persisten... pasa su uso posterior.
+
+Al haber calculado los datos previamente:
+- Cuando los quiera/necesite utilizar, ya no tengo que calcularlos otra vez (AHORRO DE TIEMPO Y PASTA ENORME)
+- OJO:
+  - Voy a tener que pagar un poquito más por el almacenamiento de esos datos
+  - Voy a tener que asegurarme que los datos se refrescan con la frecuencia adecuada
+
+## Limitaciones de las vistas materializadas en SnowFlake
+
+- Las vistas materializadas solo pueden consultar una única tabla (PRIMER OSTION EN TO'LA CARA!)
+  - NI UN JOIN !
+- Las vistas materializadas no pueden hacer uso otras vistas
+- No pueden incluir ORDER BY
+- LIMIT
+- GROUP BY con campos que no estén en el SELECT
+- MINUS, EXCEPT, INTERSECT
+- Ni muchas funciones agregadas
+- Ni hacer uso de datos no deterministas: CURRENT_TIMESTAMP
+
+TRANSIENT TABLE <<< Por aquí!
+
+---
+
+# Vistas en BBDD de cualquier tipo
+
+    Tabla usuarios:
+        | id | nombre | apellidos | 
+        |----|--------|-----------|
+        | 1  | Pepe   | Pérez     |
+        | 2  | Juan   | García    |
+        | 3  | María  | López     |
+        | 4  | Ana    | Martínez  |
+        | 5  | Luis   | Sánchez   |
+
+    Tabla direcciones:
+        | id | id_usuario | calle | numero | codigo_postal |
+        |----|------------|-------|--------|---------------|
+        | 1  | 1          | A     | 1      | 33001         |
+        | 2  | 1          | B     | 2      | 33002         |
+        | 3  | 2          | C     | 3      | 33001         |
+        | 4  | 3          | D     | 4      | 33004         |
+        | 5  | 3          | E     | 5      | 33005         |
+        | 6  | 3          | F     | 6      | 33001         |
+        | 7  | 4          | G     | 7      | 33001         |
+
+
+        Tabla usuarios -< Tabla direcciones
+            1 usuario -< N direcciones
+
+        QUERY con un join:
+            SELECT 
+              nombre,
+              apellidos, 
+              codigo_postal
+            FROM usuarios
+                 LEFT JOIN direcciones 
+                    ON usuarios.id = direcciones.id_usuario;
+
+        Saco los códigos postales de los usuarios... y si no tienen código postal, saco NULL, pero saco todos los usuarios:
+
+            | nombre | apellidos | codigo_postal |
+            |--------|-----------|---------------|
+            | Pepe   | Pérez     | 33001         |
+            | Pepe   | Pérez     | 33002         |
+            | Juan   | García    | 33001         |
+            | María  | López     | 33004         |
+            | María  | López     | 33005         |
+            | María  | López     | 33001         |
+            | Ana    | Martínez  | 33001         |
+            | Luis   | Sánchez   | NULL          |
+
+    Si esta query la voy a usar muchas veces, podría crear una vista: VIEW:
+
+            CREATE VIEW codigos_postales_usuarios AS
+            SELECT 
+              nombre,
+              apellidos, 
+              codigo_postal
+            FROM usuarios
+                 LEFT JOIN direcciones 
+                    ON usuarios.id = direcciones.id_usuario;
+
+    Lo que estamos haciendo aquí es dar un ALIAS (Un pseudónimo) a una query.
+    Esto me permite a partir de este momento escribir cosas como:
+        SELECT codigo_postal, count(*)          (2)
+            FROM codigos_postales_usuarios
+            GROUP BY codigo_postal;
+
+        | codigo_postal | count(*) |
+        |---------------|----------|
+        | 33001         | 4        |
+        | 33002         | 1        |
+        | 33004         | 1        |
+        | 33005         | 1        |
+        | NULL          | 1        |
+    
+    Ahora bien... cuando ejecuto la segunda query (2)
+    realmente el motor de base de datos lo que ejecuta es:
+
+        SELECT codigo_postal, count(*)          
+            FROM (
+                SELECT 
+                  nombre,
+                  apellidos, 
+                  codigo_postal
+                FROM usuarios
+                     LEFT JOIN direcciones 
+                        ON usuarios.id = direcciones.id_usuario
+            ) AS codigos_postales_usuarios
+            GROUP BY codigo_postal;
+    
+    Esto me ayuda a simplificar las queries. PUNTO PELOTA !
+    Ni mejora rendimiento, ni nada de nada... es una ayuda para simplificar las queries.
+    HAY UNA MICRO-OPTIMIZACION: La parte de la query de la vista queda precompilada... y no se tiene que volver a compilar cada vez que se ejecuta la query.
+
+## Un tipo especial de vista son las Vistas Materializadas
+
+Cuando creamos una vista materializada, en ese momento, se ejecuta la query, cosa que no ocurre cuando creo una vista normal... y su resultado es persistido en disco.
+
+    Con una vista normal, cada vez que uso la vista dentro de una query, se ejecuta la query asociada a la vista... y siempre obtengo datos frescos.... PERO TARDA UN MONTON, ya que siempre se ejecuta la query asociada a la vista.
+
+    Con una vista materializada, cada vez que uso la vista dentro de una query, se leen los datos de disco... y por tanto, la query se ejecuta mucho más rápido... PERO LOS DATOS PUEDEN ESTAR DESACTUALIZADOS.
+    Se muestran los datos que se persistieron en disco cuando se creó la vista materializada.
+
+        CREATE MATERIALIZED VIEW codigos_postales_usuarios AS
+                SELECT 
+                nombre,
+                apellidos, 
+                codigo_postal
+                FROM usuarios
+                    LEFT JOIN direcciones 
+                        ON usuarios.id = direcciones.id_usuario
+                CLUSTER BY codigo_postal;
+
+    Aquí el nombre de la vista no es el pseudónimo de la query... sino el nombre de una especie de tabla persistida y precalculada.
+
+    Qué ventaja me dan entonces las vistas materializadas con respecto a guardar el resultado de una query en una tabla... cosa que podría hacer:
+
+        CREATE TABLE codigos_postales_usuarios AS
+                SELECT 
+                    nombre,
+                    apellidos, 
+                    codigo_postal
+                FROM usuarios
+                    LEFT JOIN direcciones 
+                        ON usuarios.id = direcciones.id_usuario;
+
+    La ventaja es que la vista materializada se "actualiza automáticamente" cuando se actualizan los datos de las tablas que la componen.
+
+    Lo pongo entre comillas porque puede no ser instantáneo... y que consulte un dato que he metido en la tabla asociada a la vista materializada... y que no lo vea reflejado en la vista materializada... hasta que no se actualice la vista materializada.... proceso del que se encarga la BBDD.
+
+    Depende del motor de BBDD que utilice, tengo unas u otras opciones a la hora de elegir el procedimiento de refresco de las vistas materializadas:
+    - Cada vez que se actualiza una tabla asociada a la vista materializada, se actualiza la vista materializada.
+    - Cada X tiempo se actualiza la vista materializada.
+    - ...
+
+En un escenario como el vuestro (FERNANDO), os interesa más una TRANSIENT TABLE que una vista materializada.
+
+Los transient tables son tablas que se persisten... aunque en caso de fallo catastrófico de la BBDD, se pueden perder.... pero salen más baratas que las tablas persistentes (que serían las normnales).
+La cosa es que si hay un día (raro que lo haya) un fallo catastrófico, vuelvo a generar esta tabla de los datos originales y punto.
+
+Lo que hago es montar un proceso (TAREA PROGRAMADA) que los días 1 y 4 ejecute la query y genere esa transient table:
+    
+        CREATE <TRANSIENT> TABLE codigos_postales_usuarios AS
+                    SELECT 
+                        nombre,
+                        apellidos, 
+                        codigo_postal
+                    FROM usuarios
+                        LEFT JOIN direcciones 
+                            ON usuarios.id = direcciones.id_usuario;
+
+En ocasiones lo que me intesará es que la TAREA que hace eso, cambie el nombre de la tabla cada vez:
+    codigos_postales_usuarios_2021_01_01 
+    codigos_postales_usuarios_2021_01_04
+    codigos_postales_usuarios_2021_02_01
+    codigos_postales_usuarios_2021_02_04
+    codigos_postales_usuarios_2021_03_01
+    codigos_postales_usuarios_2021_03_04 << ALIAS: codigos_postales_usuarios
+
+
+    CREATE VIEW CODIGOS_POSTALES_2021
+        AS
+            SELECT * FROM codigos_postales_usuarios_2021_03_04 UNION ALL SELECT * FROM codigos_postales_usuarios_2021_03_01 UNION ALL SELECT * FROM codigos_postales_usuarios_2021_02_04 UNION ALL SELECT * FROM codigos_postales_usuarios_2021_02_01 UNION ALL SELECT * FROM codigos_postales_usuarios_2021_01_04 UNION ALL SELECT * FROM codigos_postales_usuarios_2021_01_01
+
+
+Si estoy generando 300 informes de la última tabla... en esos 300 queries o más que generen esos informes, tengo que apuntar a la última tabla generada....
+Y puedo poner un alias a la tabla
+
+Las vistas materializadas me sirven por ejemplo para dashboards en "tiempo real"
