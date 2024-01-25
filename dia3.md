@@ -106,11 +106,3 @@ Se aplican las siguientes limitaciones a la creación de vistas materializadas:
   - Las funciones utilizadas en una vista materializada deben ser deterministas. Por ejemplo, no está permitido utilizar CURRENT_TIME o CURRENT_TIMESTAMP .
 
 
-
-CREATE DATABASE IF NOT EXISTS mibd;
-CREATE SCHEMA IF NOT EXISTS mibd.mies;
--- Create a new table with the same structure as the shared table
-CREATE TABLE mibd.mies.clientes AS SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCDS_SF10TCL.CUSTOMER LIMIT 0;
-
--- Insert data from the shared table into your new table
-INSERT INTO mibd.mies.clientes SELECT * FROM SNOWFLAKE_SAMPLE_DATA.TPCDS_SF10TCL.CUSTOMER;

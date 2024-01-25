@@ -329,6 +329,9 @@ En ocasiones lo que me intesará es que la TAREA que hace eso, cambie el nombre 
     codigos_postales_usuarios_2021_03_01
     codigos_postales_usuarios_2021_03_04 << ALIAS: codigos_postales_usuarios
 
+    CREATE OR REPLACE VIEW codigos_postales_usuarios_actuales AS SELECT * FROM codigos_postales_usuarios_2021_03_04;
+    El mes que viene: 
+    CREATE OR REPLACE VIEW codigos_postales_usuarios_actuales AS SELECT * FROM codigos_postales_usuarios_2021_04_04;
 
     CREATE VIEW CODIGOS_POSTALES_2021
         AS
