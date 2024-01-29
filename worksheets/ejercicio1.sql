@@ -347,4 +347,30 @@ ORDER BY
 --- Contabilizando por meses... los meses en lo que hemos doblado ingresos con respecto al anterior (ws_net_paid)
 
 
-
+WITH importes_por_meses AS (
+    SELECT
+        d_year,
+        d_moy,
+        sum(ws_net_paid) as importe_total_mes
+    FROM
+        SNOWFLAKE_SAMPLE_DATA.TPCDS_SF10TCL.WEB_SALES as ventas
+        INNER JOIN fechas ON ventas.ws_sold_date_sk = fechas.d_date_sk
+    GROUP BY 
+        d_year,
+        d_moy
+)
+SELECT 
+    d_year,
+    d_moy,
+    importe_total_mes,
+    --SUM(importe_total_mes) OVER( ORDER BY d_year, d_moy ROWS BETWEEN 1 PRECEDING AND 1 PRECEDING) as importe_mes_anterior
+    LAG(importe_total_mes, 1) OVER(ORDER BY d_year, d_moy) as importe_mes_anterior
+FROM
+    importes_por_meses
+QUALIFY -- Me permite filtros en las operaciones de ventana... igual que en las funciones de agregacion normales,
+        -- los filtros tampoco los ponemos en el WHERE sino en el HAVING
+    importe_total_mes / importe_mes_anterior >= 2
+ORDER BY 
+    d_year,
+    d_moy
+;

@@ -95,3 +95,37 @@ FROM ventas;
 305408 y 30973 tienen el mismo maximo... y toma uno de ellos.            
 
 SELECT ws_item_sk, ws_net_sold FROM ventas WHERE ws_item_sk IN (305408, 30973);
+
+----
+
+# Para que mis queries vayan más ligeras
+
+- Modelo en estrella (Me evitan joins)
+- Técnicas avanzadas dentro de snowflake: clustering, materialized views, etc.
+- Consultas:
+  - JOINS fuera
+  - Filtros:
+    - Aplicarlos lo antes posible
+    - Nada de funciones en filtros.
+      - MONTH(date) = 1 RUINA
+      - LIKE '%alsks%'  RUINA 
+      - OPERADORES + - * / RUINA !
+    - Los filtros de tipo:
+      - =
+      - >
+      - < 
+      - in
+  - Columnas las menos posibles
+  - Las columnas de etiquetas, al final ... no las voy arrastrando desde la primera query
+  - Limitar el uso de estas palabras salvo para casos estrictamente necesarios:
+    - DISTINCT
+    - GROUP BY
+    - ORDER BY
+    - OUTTER JOINS (LEFT, RIGHT)
+    - UNION (en su lugar UNION ALL)
+    - Subqueries... en muchos casos se pueden sustituir por JOINS.
+      En otro motored de BBDD esta optimización es realizada sin problema por el planificador de queries 
+      En SF no se le da tan bien.
+  - Usar funciones GUAYs de SF:
+    - APROX para análisis exploratorio
+    - Funciones de ventana (over + qualify)
