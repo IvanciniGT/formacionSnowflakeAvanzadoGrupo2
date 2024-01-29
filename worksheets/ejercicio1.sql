@@ -151,8 +151,8 @@ FROM
 
 -- Dame el ID de los productos (ws_item_sk)  que se han vendido con más cobro (ws_net_paid máximo)
 SELECT 
-    ws_item_sk, 
-    MAX(ws_net_paid) as importe_maximo
+    ws_item_sk
+    , MAX(ws_net_paid) as importe_maximo
 FROM 
     ventas
 WHERE 
@@ -162,10 +162,47 @@ GROUP BY
 ORDER BY importe_maximo DESC
 LIMIT 5;
 
+---
+WITH top_productos AS (
+    SELECT 
+        MAX_BY(ws_item_sk,ws_net_paid, 5) as maximos -- MIN_BY
+    FROM ventas
+)
+SELECT value::INT as top_product_id
+FROM top_productos, LATERAL FLATTEN (top_productos.maximos);
 
 
-    
+SELECT ws_item_sk, ws_net_paid FROM ventas WHERE ws_item_sk IN (305408, 30973) ORDER BY ws_net_paid DESC;
 
+---
+-- Generar tablas de datos dentro de una query
+SELECT 
+    * -- Las columas reciben como nombre: column1, column2....
+FROM
+    values 
+        (1,'a'),
+        (1, null),
+        (2, null),
+        (null, 'a'),
+        (null, null);
+---
+SELECT 
+    column1,
+    column2,
+    COALESCE(column1, column2) as primer_no_nulo,
+    IFF(column1 is null,'NULO','NO NULO') as nulo,
+    IFF(column2 > 3,'MAYOR','NO MAYOR') as mayor_que_3,
+    IFNULL(column1, -5) as modificado,
+    DECODE(column1, 1, 'UNO', NULL, 'NULO', 'OTRO') as col1_texto
+FROM
+    values 
+        (1,2),
+        (1, null),
+        (2, null),
+        (null,5),
+        (null, null);
+
+---
 
 
 
