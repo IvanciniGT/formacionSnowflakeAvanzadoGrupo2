@@ -203,16 +203,148 @@ FROM
         (null, null);
 
 ---
+-- FECHAS
 
+SELECT 
+    SYSDATE(),           -- Me devuelve el timestamp actual (fecha+hora)  trabaja sin zona horaria (UTC... zona 0)
+    CURRENT_TIMESTAMP(); -- Me devuelve el timestamp actual (fecha+hora)  trabaja con la zona horaria de la sesión del usuario
 
+ALTER SESSION SET TIMEZONE = 'Europe/Lisbon';
+SELECT 
+    SYSDATE(),           -- Me devuelve el timestamp actual (fecha+hora)  trabaja sin zona horaria (UTC... zona 0)
+    CURRENT_TIMESTAMP(); -- Me devuelve el timestamp actual (fecha+hora)  trabaja con la zona horaria de la sesión del usuario
 
+ALTER SESSION SET TIMEZONE = 'Europe/Madrid';
+SELECT 
+    SYSDATE(),           -- Me devuelve el timestamp actual (fecha+hora)  trabaja sin zona horaria (UTC... zona 0)
+    CURRENT_TIMESTAMP(),  -- Me devuelve el timestamp actual (fecha+hora)  trabaja con la zona horaria de la sesión del usuario
+    LOCALTIMESTAMP,
+    CURRENT_DATE,
+    CURRENT_TIME,
+    LOCALTIME;
+    
+SELECT 
+    SYSDATE(),           -- Me devuelve el timestamp actual (fecha+hora)  trabaja sin zona horaria (UTC... zona 0)
+    CURRENT_TIMESTAMP,  -- Me devuelve el timestamp actual (fecha+hora)  trabaja con la zona horaria de la sesión del usuario
+    LOCALTIMESTAMP(),
+    CURRENT_DATE(),
+    CURRENT_TIME(),
+    LOCALTIME();
+-- LAs funciones sin arrgumentos, las puedo invocar sin parentesis.
+ALTER SESSION SET TIMESTAMP_LTZ_OUTPUT_FORMAT = 'YYYY-MM-DD HH24:MI:SS';
+ALTER SESSION SET TIMESTAMP_NTZ_OUTPUT_FORMAT = 'YYYY-MM-DD HH24:MI:SS';
 
+SELECT 
+    SYSDATE(),           -- Me devuelve el timestamp actual (fecha+hora)  trabaja sin zona horaria (UTC... zona 0)
+    CURRENT_TIMESTAMP,  -- Me devuelve el timestamp actual (fecha+hora)  trabaja con la zona horaria de la sesión del usuario
+    LOCALTIMESTAMP(),
+    CURRENT_DATE(),
+    CURRENT_TIME(),
+    LOCALTIME();
 
+SELECT TO_DATE('29/01/2024', 'DD/MM/YYYY'),TO_DATE('01/29/2024', 'MM/DD/YYYY');
+SELECT TO_DATE('29/043/2024', 'DD/MM/YYYY'),TO_DATE('01/29/2024', 'MM/DD/YYYY'); -- No cumple formato. ERROR Y se para query
+SELECT TRY_TO_DATE('29/043/2024', 'DD/MM/YYYY'),TO_DATE('01/29/2024', 'MM/DD/YYYY'); -- No cumple formato, se devuelve null y sigue la query
+SELECT TO_NUMBER('1237465');
+SELECT TO_NUMBER('1237465a');
+SELECT TRY_TO_NUMBER('1237465'),TRY_TO_NUMBER('1237465a');
 
+--DATEADD
+-----
+-- Además de todas las funciones típicas de SQL, aprovechando el tema del JSON, tenemos algunas funciones adicionales chulas
 
+WITH frutas AS (
+    SELECT 
+        column1 as fruta,
+        column2 as colores
+    FROM 
+        values 
+        ('manzana', 'roja,verde,amarilla'),
+        ('ciruela', 'morada,verde,amarilla')
+)
+SELECT 
+    fruta,
+    colores,
+    split(colores,',') as color_array
+FROM frutas
+;
 
+-- Quiero cada fruta con cada uno de sus colores disponibles... es decir, quiero acabar con 6 filas.
+WITH frutas AS (
+    SELECT 
+        column1 as fruta,
+        column2 as colores
+    FROM 
+        values 
+        ('manzana', 'roja,verde,amarilla'),
+        ('ciruela', 'morada,verde,amarilla')
+)
+SELECT 
+    --fruta,
+    --colores,
+    --*
+    fruta,
+    value::string as color
+FROM 
+    frutas,
+    LATERAL FLATTEN (split(colores,','))
+;
+--- TODAS LAS FUNCIONES DE SNOWFLAKE: https://docs.snowflake.com/sql-reference/functions
 
+--- Funciones de ventana
 
+-- Importe total cobrado neto por dia
+WITH importes_por_dia_2000 AS (
+    SELECT
+        d_year,
+        d_moy,
+        d_dom,
+        sum(ws_net_paid) as importe_total_dia
+    FROM
+        --ventas
+        SNOWFLAKE_SAMPLE_DATA.TPCDS_SF10TCL.WEB_SALES as ventas
+        --, fechas
+        INNER JOIN fechas ON ventas.ws_sold_date_sk = fechas.d_date_sk
+    WHERE 
+        --ventas.ws_sold_date_sk = fechas.d_date_sk and
+        fechas.d_year = 2000
+    GROUP BY 
+        d_year,
+        d_moy,
+        d_dom
+)
+SELECT 
+    d_year,
+    d_moy,
+    d_dom,
+    importe_total_dia,
+    SUM(importe_total_dia) OVER(PARTITION BY d_moy ) as importe_total_mensual,
+    SUM(importe_total_dia) OVER() as importe_total_anual,
+    RANK() OVER( ORDER BY importe_total_dia DESC) as ranking_anual,
+    RANK() OVER( PARTITION BY d_moy ORDER BY importe_total_dia DESC) as ranking_mensual,
+    SUM(importe_total_dia) OVER(
+        ORDER BY d_year, d_moy, d_dom
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) as acumulado_anual,
+    SUM(importe_total_dia) OVER(
+        PARTITION BY d_moy
+        ORDER BY d_year, d_moy, d_dom
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) as acumulado_mensual,
+    AVG(importe_total_dia) OVER(
+        ORDER BY d_year, d_moy, d_dom
+        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+    )as media_movil_a_7_dias,
+    importe_total_dia
+FROM
+    importes_por_dia_2000
+ORDER BY 
+    d_year,
+    d_moy,
+    d_dom
+;
+
+--- Contabilizando por meses... los meses en lo que hemos doblado ingresos con respecto al anterior (ws_net_paid)
 
 
 
