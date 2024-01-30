@@ -228,7 +228,7 @@ $$
     var queryInvocarAlOtroProcedimiento = "CALL extraer_datos_mes(:1,:2)" ;                             //    :1         :2
     var resultadoProcedimiento = snowflake.execute( {sqlText: queryInvocarAlOtroProcedimiento, binds: [anioAnterior, mesAnterior]} ) ;
     resultadoProcedimiento.next() ;
-    var numeroFilas = resultadoContar.getColumnValue(1) ;
+    var numeroFilas = resultadoProcedimiento.getColumnValue(1) ;
     return numeroFilas ;
 $$
 ;
