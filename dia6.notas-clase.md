@@ -116,11 +116,44 @@ $$
     var resultadoMesAnterior = snowflake.execute( {sqlText: queryMesAnterior} ) ;
     // Recibo una tabla de datos
     resultadoMesAnterior.next() ;
-    // Me ubica en la primera fila... en conrceto esta query solo devuelve una fila... pero podría devolver más... y cada .next() avanzaría de fila.
+    // Me ubica en la primera fila... en concreto esta query solo devuelve una fila... pero podría devolver más... y cada .next() avanzaría de fila.
     var mesAnterior = resultadoMesAnterior.getColumnValue(2) ;
     var anioAnterior = resultadoMesAnterior.getColumnValue(3) ;
     var nombreNuevaTabla = resultadoMesAnterior.getColumnValue(4) ;
 
+    // Paso 2: OPCION 1: Voy a mirar si la tabla existe 
+    var queryNuevaTabla = "CREATE TABLE "+nombreNuevaTabla+" AS SELECT * FROM ventas LIMIT 0" ;
+    var resultadoExistenciaNuevaTabla = snowflake.execute( {sqlText: "SHOW TABLES LIKE '"+nombreNuevaTabla+"'"} ) ;
+    if(resultadoExistenciaNuevaTabla.next()) {
+        // Significa que se ha encontrado la tabla. LA BORRO
+        queryNuevaTabla = "TRUNCATE TABLE "+nombreNuevaTabla ;
+    }
+    snowflake.execute( {sqlText: queryNuevaTabla} ) ;
+/*
+    // Paso 2: OTRA OPCION 1: Voy a mirar si la tabla existe 
+    var resultadoExistenciaNuevaTabla = snowflake.execute( {sqlText: "SHOW TABLES LIKE '"+nombreNuevaTabla+"'"} ) ;
+    if(resultadoExistenciaNuevaTabla.next()) {
+        // Significa que se ha encontrado la tabla. LA BORRO
+        queryNuevaTabla = "TRUNCATE TABLE "+nombreNuevaTabla ;
+    }else{
+        // Significa que NO se ha encontrado la tabla. LA CREO
+        queryNuevaTabla = "CREATE TABLE "+nombreNuevaTabla+" AS SELECT * FROM ventas LIMIT 0" ;
+    }
+    snowflake.execute( {sqlText: queryNuevaTabla} ) ;
+
+    // Paso 2. OPCION 2: Fuerzo siempre la recreación de la tabla
+    var queryNuevaTabla = "CREATE OR REPLACE TABLE "+nombreNuevaTabla+" AS SELECT * FROM ventas LIMIT 0" ;
+    snowflake.execute( {sqlText: queryNuevaTabla} ) ;
+
+    // Paso 2. OPCION 3: Borro tabla y la creo después:
+    var queryNuevaTabla = "DROP TABLE IF EXISTS "+nombreNuevaTabla ;
+    snowflake.execute( {sqlText: queryNuevaTabla} ) ;
+    var queryNuevaTabla = "CREATE TABLE "+nombreNuevaTabla+" AS SELECT * FROM ventas LIMIT 0" ;
+    snowflake.execute( {sqlText: queryNuevaTabla} ) ;
+*/
+    // Paso 3: Popular los nuevos datos
+    var queryCopiadoDatos = "INSERT INTO "+nombreNuevaTabla+" SELECT * FROM ventas" ;
+    snowflake.execute( {sqlText: queryCopiadoDatos} ) ;
 
 
 
