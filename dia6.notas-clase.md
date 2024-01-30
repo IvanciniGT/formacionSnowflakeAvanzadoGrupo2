@@ -98,3 +98,34 @@ Los streams nos permiten MONITORIZAR una tabla en busca de cambio:
 - Updates
 - Deletes
 Esa información la uso después para montar ETLs.
+
+
+---
+
+```sql
+
+CREATE OR REPLACE PROCEDURE
+    extraer_datos_mes_anterior()
+RETURNS DOUBLE
+LANGUAGE JAVASCRIPT
+AS
+$$
+    // Paso 1: Calcular el mes y el año del mes anterior al actual
+
+    var queryMesAnterior = "SELECT DATEADD(MONTH, -1, CURRENT_DATE()) as mes_anterior, MONTH(mes_anterior) as mes, YEAR(mes_anterior) as anio, 'ventas_' || anio || '_' || LPAD(mes,2,'0') as nombre_tabla" ;
+    var resultadoMesAnterior = snowflake.execute( {sqlText: queryMesAnterior} ) ;
+    // Recibo una tabla de datos
+    resultadoMesAnterior.next() ;
+    // Me ubica en la primera fila... en conrceto esta query solo devuelve una fila... pero podría devolver más... y cada .next() avanzaría de fila.
+    var mesAnterior = resultadoMesAnterior.getColumnValue(2) ;
+    var anioAnterior = resultadoMesAnterior.getColumnValue(3) ;
+    var nombreNuevaTabla = resultadoMesAnterior.getColumnValue(4) ;
+
+
+
+
+
+$$
+;
+
+```
