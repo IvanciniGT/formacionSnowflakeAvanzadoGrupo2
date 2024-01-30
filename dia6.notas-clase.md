@@ -176,6 +176,41 @@ $$
 ```sql
 
 CREATE OR REPLACE PROCEDURE
+    extraer_datos_mes( ANIO DOUBLE, mes DOUBLE)
+RETURNS DOUBLE
+LANGUAGE JAVASCRIPT
+AS
+$$
+    // Paso 1: Calcular nombre de la tabla
+    var nombreNuevaTabla = "ventas_" + ANIO + "_" + ("0"+MES).substr(-2) ;
+
+    // Paso 2: OPCION 1: Voy a mirar si la tabla existe 
+    var queryNuevaTabla = "CREATE TABLE "+nombreNuevaTabla+" AS SELECT * FROM ventas LIMIT 0" ;
+    var resultadoExistenciaNuevaTabla = snowflake.execute( {sqlText: "SHOW TABLES LIKE '"+nombreNuevaTabla+"'"} ) ;
+    if(resultadoExistenciaNuevaTabla.next()) {
+        // Significa que se ha encontrado la tabla. LA BORRO
+        queryNuevaTabla = "TRUNCATE TABLE "+nombreNuevaTabla ;
+    }
+    snowflake.execute( {sqlText: queryNuevaTabla} ) ;
+
+    // Paso 3: Popular los nuevos datos
+    var queryCopiadoDatos = "INSERT INTO "+nombreNuevaTabla+" SELECT v.* FROM ventas v INNER JOIN fechas f ON v.ws_sold_date_sk = f.d_date_sk WHERE f.d_year = "+ANIO+" AND f.d_moy = "+MES ;
+    snowflake.execute( {sqlText: queryCopiadoDatos} ) ;
+
+    // Paso 4: Crear la view: ventas_mes_anterior
+    var queryCreacionVista = "CREATE OR REPLACE VIEW ventas_mes_anterior AS SELECT * FROM "+nombreNuevaTabla ;
+    snowflake.execute( {sqlText: queryCreacionVista} ) ;
+
+    // Paso 5: Contamos los elementos de la vista y devolvemos ese dato
+    var queryContar = "SELECT COUNT(*) FROM ventas_mes_anterior" ;
+    var resultadoContar = snowflake.execute( {sqlText: queryContar} ) ;
+    resultadoContar.next() ;
+    var numeroFilas = resultadoContar.getColumnValue(1) ;
+    return numeroFilas ;
+$$
+;
+
+CREATE OR REPLACE PROCEDURE
     extraer_datos_mes_anterior()
 RETURNS DOUBLE
 LANGUAGE JAVASCRIPT
@@ -217,5 +252,16 @@ $$
     return numeroFilas ;
 $$
 ;
-
 ```
+
+
+
+    extraer_datos_mes_anterior()
+        PASO 1
+        Llama al de abajo
+    extraer_datos_mes(2001, 1)
+        PASO 2
+        PASO 3
+        PASO 4
+        PASO 5
+
