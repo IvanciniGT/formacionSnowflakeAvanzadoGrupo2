@@ -152,12 +152,69 @@ $$
     snowflake.execute( {sqlText: queryNuevaTabla} ) ;
 */
     // Paso 3: Popular los nuevos datos
-    var queryCopiadoDatos = "INSERT INTO "+nombreNuevaTabla+" SELECT * FROM ventas" ;
+    var queryCopiadoDatos = "INSERT INTO "+nombreNuevaTabla+" SELECT v.* FROM ventas v INNER JOIN fechas f ON v.ws_sold_date_sk = f.d_date_sk WHERE f.d_year = "+anioAnterior+" AND f.d_moy = "+mesAnterior ;
     snowflake.execute( {sqlText: queryCopiadoDatos} ) ;
 
+    // Paso 4: Crear la view: ventas_mes_anterior
+    var queryCreacionVista = "CREATE OR REPLACE VIEW ventas_mes_anterior AS SELECT * FROM "+nombreNuevaTabla ;
+    snowflake.execute( {sqlText: queryCreacionVista} ) ;
+
+    // Paso 5: Contamos los elementos de la vista y devolvemos ese dato
+    var queryContar = "SELECT COUNT(*) FROM ventas_mes_anterior" ;
+    var resultadoContar = snowflake.execute( {sqlText: queryContar} ) ;
+    resultadoContar.next() ;
+    var numeroFilas = resultadoContar.getColumnValue(1) ;
+    return numeroFilas ;
+$$
+;
+
+```
 
 
+---
 
+```sql
+
+CREATE OR REPLACE PROCEDURE
+    extraer_datos_mes_anterior()
+RETURNS DOUBLE
+LANGUAGE JAVASCRIPT
+AS
+$$
+    // Paso 1: Calcular el mes y el año del mes anterior al actual
+
+    var queryMesAnterior = "SELECT DATEADD(MONTH, -1, CURRENT_DATE()) as mes_anterior, MONTH(mes_anterior) as mes, YEAR(mes_anterior) as anio, 'ventas_' || anio || '_' || LPAD(mes,2,'0') as nombre_tabla" ;
+    var resultadoMesAnterior = snowflake.execute( {sqlText: queryMesAnterior} ) ;
+    // Recibo una tabla de datos
+    resultadoMesAnterior.next() ;
+    // Me ubica en la primera fila... en concreto esta query solo devuelve una fila... pero podría devolver más... y cada .next() avanzaría de fila.
+    var mesAnterior = resultadoMesAnterior.getColumnValue(2) ;
+    var anioAnterior = resultadoMesAnterior.getColumnValue(3) ;
+    var nombreNuevaTabla = resultadoMesAnterior.getColumnValue(4) ;
+
+    // Paso 2: OPCION 1: Voy a mirar si la tabla existe 
+    var queryNuevaTabla = "CREATE TABLE "+nombreNuevaTabla+" AS SELECT * FROM ventas LIMIT 0" ;
+    var resultadoExistenciaNuevaTabla = snowflake.execute( {sqlText: "SHOW TABLES LIKE '"+nombreNuevaTabla+"'"} ) ;
+    if(resultadoExistenciaNuevaTabla.next()) {
+        // Significa que se ha encontrado la tabla. LA BORRO
+        queryNuevaTabla = "TRUNCATE TABLE "+nombreNuevaTabla ;
+    }
+    snowflake.execute( {sqlText: queryNuevaTabla} ) ;
+
+    // Paso 3: Popular los nuevos datos
+    var queryCopiadoDatos = "INSERT INTO "+nombreNuevaTabla+" SELECT v.* FROM ventas v INNER JOIN fechas f ON v.ws_sold_date_sk = f.d_date_sk WHERE f.d_year = "+anioAnterior+" AND f.d_moy = "+mesAnterior ;
+    snowflake.execute( {sqlText: queryCopiadoDatos} ) ;
+
+    // Paso 4: Crear la view: ventas_mes_anterior
+    var queryCreacionVista = "CREATE OR REPLACE VIEW ventas_mes_anterior AS SELECT * FROM "+nombreNuevaTabla ;
+    snowflake.execute( {sqlText: queryCreacionVista} ) ;
+
+    // Paso 5: Contamos los elementos de la vista y devolvemos ese dato
+    var queryContar = "SELECT COUNT(*) FROM ventas_mes_anterior" ;
+    var resultadoContar = snowflake.execute( {sqlText: queryContar} ) ;
+    resultadoContar.next() ;
+    var numeroFilas = resultadoContar.getColumnValue(1) ;
+    return numeroFilas ;
 $$
 ;
 
