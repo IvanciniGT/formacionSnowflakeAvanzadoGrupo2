@@ -93,7 +93,7 @@ Queremos un procedimiento que cuando se ejecutado:
 
 ## STREAMS
 
-Los streams nos permiten MONITORIZAR una tabla en busca de cambio:
+Los streams nos permiten MONITORIZAR una tabla en busca de cambios:
 - Inserts
 - Updates
 - Deletes
@@ -181,6 +181,12 @@ RETURNS DOUBLE
 LANGUAGE JAVASCRIPT
 AS
 $$
+    // Paso 0: Validar los datos de entrada
+    if( ANIO < 1000 || ANIO > 3000 )
+        throw "El año debe ser válido" ; // CORTA LA EJECUCION y MUESTRA ESE MENSAJE AL USUARIO QUE EJECUTA EL PROCEDIMIENTO
+    if( MES < 1 || MES > 12 )
+        throw "El mes debe estar entre 1 y 12 incluidos" ;
+
     // Paso 1: Calcular nombre de la tabla
     var nombreNuevaTabla = "ventas_" + ANIO + "_" + ("0"+MES).substr(-2) ;
 
