@@ -103,7 +103,7 @@ SELECT ws_item_sk, ws_net_sold FROM ventas WHERE ws_item_sk IN (305408, 30973);
 - Modelo en estrella (Me evitan joins)
 - Técnicas avanzadas dentro de snowflake: clustering, materialized views, etc.
 - Consultas:
-  - JOINS fuera
+  - Quitar todos los JOINS susceptibles de ser quitados
   - Filtros:
     - Aplicarlos lo antes posible
     - Nada de funciones en filtros.

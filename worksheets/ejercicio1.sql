@@ -374,3 +374,260 @@ ORDER BY
     d_year,
     d_moy
 ;
+SHOW TABLES LIKE 'venjhgtas';
+---
+-- PROCEDIMIENTO ALMACENADO
+---
+-- Query para ayudarnos a sacar el mes y año del mes anterior
+SELECT DATEADD(MONTH, -1, CURRENT_DATE()) as mes_anterior, MONTH(mes_anterior) as mes, YEAR(mes_anterior) as anio,
+    'ventas_' || anio || '_' || LPAD(mes,2,'0') as nombre_tabla
+;
+
+
+
+
+
+
+CREATE OR REPLACE PROCEDURE
+    extraer_datos_mes_anterior()
+RETURNS DOUBLE
+LANGUAGE JAVASCRIPT
+AS
+$$
+    // Paso 1: Calcular el mes y el año del mes anterior al actual
+
+    var queryMesAnterior = "SELECT DATEADD(MONTH, -1, CURRENT_DATE()) as mes_anterior, MONTH(mes_anterior) as mes, YEAR(mes_anterior) as anio, 'ventas_' || anio || '_' || LPAD(mes,2,'0') as nombre_tabla" ;
+    var resultadoMesAnterior = snowflake.execute( {sqlText: queryMesAnterior} ) ;
+    // Recibo una tabla de datos
+    resultadoMesAnterior.next() ;
+    // Me ubica en la primera fila... en concreto esta query solo devuelve una fila... pero podría devolver más... y cada .next() avanzaría de fila.
+    var mesAnterior = resultadoMesAnterior.getColumnValue(2) ;
+    var anioAnterior = resultadoMesAnterior.getColumnValue(3) ;
+    var nombreNuevaTabla = resultadoMesAnterior.getColumnValue(4) ;
+
+    // Paso 2: OPCION 1: Voy a mirar si la tabla existe 
+    var queryNuevaTabla = "CREATE TABLE "+nombreNuevaTabla+" AS SELECT * FROM ventas LIMIT 0" ;
+    var resultadoExistenciaNuevaTabla = snowflake.execute( {sqlText: "SHOW TABLES LIKE '"+nombreNuevaTabla+"'"} ) ;
+    if(resultadoExistenciaNuevaTabla.next()) {
+        // Significa que se ha encontrado la tabla. LA BORRO
+        queryNuevaTabla = "TRUNCATE TABLE "+nombreNuevaTabla ;
+    }
+    snowflake.execute( {sqlText: queryNuevaTabla} ) ;
+
+    // Paso 3: Popular los nuevos datos
+    var queryCopiadoDatos = "INSERT INTO "+nombreNuevaTabla+" SELECT v.* FROM ventas v INNER JOIN fechas f ON v.ws_sold_date_sk = f.d_date_sk WHERE f.d_year = "+anioAnterior+" AND f.d_moy = "+mesAnterior ;
+    snowflake.execute( {sqlText: queryCopiadoDatos} ) ;
+
+    // Paso 4: Crear la view: ventas_mes_anterior
+    var queryCreacionVista = "CREATE OR REPLACE VIEW ventas_mes_anterior AS SELECT * FROM "+nombreNuevaTabla ;
+    snowflake.execute( {sqlText: queryCreacionVista} ) ;
+
+    // Paso 5: Contamos los elementos de la vista y devolvemos ese dato
+    var queryContar = "SELECT COUNT(*) FROM ventas_mes_anterior" ;
+    var resultadoContar = snowflake.execute( {sqlText: queryContar} ) ;
+    resultadoContar.next() ;
+    var numeroFilas = resultadoContar.getColumnValue(1) ;
+    return numeroFilas ;
+$$
+;
+
+CALL extraer_datos_mes_anterior();
+
+
+
+CREATE OR REPLACE PROCEDURE
+    extraer_datos_mes( ANIO DOUBLE, mes DOUBLE)
+RETURNS DOUBLE
+LANGUAGE JAVASCRIPT
+AS
+$$
+    // Paso 1: Calcular nombre de la tabla
+    var nombreNuevaTabla = "ventas_" + ANIO + "_" + ("0"+MES).substr(-2) ;
+
+    // Paso 2: OPCION 1: Voy a mirar si la tabla existe 
+    var queryNuevaTabla = "CREATE TABLE "+nombreNuevaTabla+" AS SELECT * FROM ventas LIMIT 0" ;
+    var resultadoExistenciaNuevaTabla = snowflake.execute( {sqlText: "SHOW TABLES LIKE '"+nombreNuevaTabla+"'"} ) ;
+    if(resultadoExistenciaNuevaTabla.next()) {
+        // Significa que se ha encontrado la tabla. LA BORRO
+        queryNuevaTabla = "TRUNCATE TABLE "+nombreNuevaTabla ;
+    }
+    snowflake.execute( {sqlText: queryNuevaTabla} ) ;
+
+    // Paso 3: Popular los nuevos datos
+    var queryCopiadoDatos = "INSERT INTO "+nombreNuevaTabla+" SELECT v.* FROM ventas v INNER JOIN fechas f ON v.ws_sold_date_sk = f.d_date_sk WHERE f.d_year = "+ANIO+" AND f.d_moy = "+MES ;
+    snowflake.execute( {sqlText: queryCopiadoDatos} ) ;
+
+    // Paso 4: Crear la view: ventas_mes_anterior
+    var queryCreacionVista = "CREATE OR REPLACE VIEW ventas_mes_anterior AS SELECT * FROM "+nombreNuevaTabla ;
+    snowflake.execute( {sqlText: queryCreacionVista} ) ;
+
+    // Paso 5: Contamos los elementos de la vista y devolvemos ese dato
+    var queryContar = "SELECT COUNT(*) FROM ventas_mes_anterior" ;
+    var resultadoContar = snowflake.execute( {sqlText: queryContar} ) ;
+    resultadoContar.next() ;
+    var numeroFilas = resultadoContar.getColumnValue(1) ;
+    return numeroFilas ;
+$$
+;
+CALL extraer_datos_mes(2001,1);
+
+
+
+
+CREATE OR REPLACE PROCEDURE
+    extraer_datos_mes( ANIO DOUBLE, mes DOUBLE)
+RETURNS DOUBLE
+LANGUAGE JAVASCRIPT
+AS
+$$
+    // Paso 0: Validar los datos de entrada
+    if( ANIO < 1000 || ANIO > 3000 )
+        throw "El año debe ser válido" ; // CORTA LA EJECUCION y MUESTRA ESE MENSAJE AL USUARIO QUE EJECUTA EL PROCEDIMIENTO
+    if( MES < 1 || MES > 12 )
+        throw "El mes debe estar entre 1 y 12 incluidos" ;
+
+
+    snowflake.log("info","Iniciando informe del mes "+ MES + " del AÑO: "+ANIO ); // Hay distinto sniveles de log: DEBUG > INFO > ERROR > FATAL
+    // Paso 1: Calcular nombre de la tabla
+    var nombreNuevaTabla = "ventas_" + ANIO + "_" + ("0"+MES).substr(-2) ;
+
+    // Paso 2: OPCION 1: Voy a mirar si la tabla existe 
+    var queryNuevaTabla = "CREATE TABLE "+nombreNuevaTabla+" AS SELECT * FROM ventas LIMIT 0" ;
+    var resultadoExistenciaNuevaTabla = snowflake.execute( {sqlText: "SHOW TABLES LIKE '"+nombreNuevaTabla+"'"} ) ;
+    if(resultadoExistenciaNuevaTabla.next()) {
+        // Significa que se ha encontrado la tabla. LA BORRO
+        queryNuevaTabla = "TRUNCATE TABLE "+nombreNuevaTabla ;
+        snowflake.log("debug","Eliminando datos anteriores" ); 
+    }
+    snowflake.execute( {sqlText: queryNuevaTabla} ) ;
+
+    // Paso 3: Popular los nuevos datos
+    var queryCopiadoDatos = "INSERT INTO "+nombreNuevaTabla+" SELECT v.* FROM ventas v INNER JOIN fechas f ON v.ws_sold_date_sk = f.d_date_sk WHERE f.d_year = ? AND f.d_moy = ? " ;
+    snowflake.execute( {sqlText: queryCopiadoDatos, binds: [ANIO, MES]} ) ;
+
+    // Paso 4: Crear la view: ventas_mes_anterior
+    var queryCreacionVista = "CREATE OR REPLACE VIEW ventas_mes_anterior AS SELECT * FROM "+nombreNuevaTabla ;
+    snowflake.execute( {sqlText: queryCreacionVista} ) ;
+
+    // Paso 5: Contamos los elementos de la vista y devolvemos ese dato
+    var queryContar = "SELECT COUNT(*) FROM ventas_mes_anterior" ;
+    var resultadoContar = snowflake.execute( {sqlText: queryContar} ) ;
+    resultadoContar.next() ;
+    var numeroFilas = resultadoContar.getColumnValue(1) ;
+    snowflake.log("info","Informe del mes "+ MES + " del AÑO: "+ANIO +" finalizado");
+
+    return numeroFilas ;
+$$
+;
+
+CREATE OR REPLACE PROCEDURE
+    extraer_datos_mes_anterior()
+RETURNS DOUBLE
+LANGUAGE JAVASCRIPT
+AS
+$$
+    // Paso 1: Calcular el mes y el año del mes anterior al actual
+
+    var queryMesAnterior = "SELECT DATEADD(MONTH, -1, CURRENT_DATE()) as mes_anterior, MONTH(mes_anterior) , YEAR(mes_anterior) ";
+    var resultadoMesAnterior = snowflake.execute( {sqlText: queryMesAnterior} ) ;
+    resultadoMesAnterior.next() ;
+    var mesAnterior = resultadoMesAnterior.getColumnValue(2) ;
+    var anioAnterior = resultadoMesAnterior.getColumnValue(3) ;
+
+    // Paso 2: Invoco al procedimiento anterior con los datos del mes anterior
+    var queryInvocarAlOtroProcedimiento = "CALL extraer_datos_mes(:1,:2)" ;                             //    :1         :2
+    var resultadoProcedimiento = snowflake.execute( {sqlText: queryInvocarAlOtroProcedimiento, binds: [anioAnterior, mesAnterior]} ) ;
+    resultadoProcedimiento.next() ;
+    var numeroFilas = resultadoProcedimiento.getColumnValue(1) ;
+    return numeroFilas ;
+$$
+;
+
+CALL extraer_datos_mes_anterior();
+CALL extraer_datos_mes(2002,11);
+
+-- los logs van a una tabla de snowflake.
+-- para ver la tabla que tengo configurada: 
+SHOW PARAMETERS LIKE 'EVENT_TABLE' IN ACCOUNT;
+-- CREAMOS UNA TABLA DE EVENTOS
+CREATE OR REPLACE EVENT TABLE mibd.mies.eventos;
+ALTER ACCOUNT SET EVENT_TABLE = mibd.mies.eventos;
+SHOW PARAMETERS LIKE 'EVENT_TABLE' IN ACCOUNT;
+-- Establecer el nivel de log que queremos ALMACENAR en la tabla.
+ALTER DATABASE mibd SET LOG_LEVEL = INFO; --Esto registra todos los eventos de tipo INFO o SUPERIOR: WARN > ERROR > FATAL
+ALTER PROCEDURE extraer_datos_mes(DOUBLE,DOUBLE) SET LOG_LEVEL = DEBUG; --Esto registra todos los eventos de tipo DEBUG  o SUPERIOR: INFO > WARN > ERROR > FATAL pero para este procedimiento... para otros.. lo que haya configurado a nivel de la BBDD
+
+CALL extraer_datos_mes(2002,12);
+
+TRUNCATE TABLE mibd.mies.eventos;
+
+SELECT * FROM mibd.mies.eventos;
+
+CREATE OR REPLACE TASK tarea_generar_informe_mensual
+    WAREHOUSE = compute_wh
+    SCHEDULE  = --'USING CRON 0 0 1 * * Europe/Madrid' --UTC' -- A las 0 horas del dia 1 de cada mes
+                --'USING CRON 0 * * * * Europe/Madrid' --UTC' -- EN EL MINUTO 0 DE CADA HORA
+                'USING CRON * * * * * Europe/Madrid' --UTC' -- CADA MINUTO
+                --          m h d M dw
+                --          m: Minutos
+                --          h: Horas
+                --          d: Dias
+                --          M: Mes
+                --          dw: Dia de la semana
+                -- Un * significa en cualquiera
+                -- '1 day' '2 month' '15 minute' RUINA !
+    AS
+        -- UNA QUERY... SOLO 1
+        -- CLARO... una query en general me queda un poco pobre... querré hacer más cosas.
+        -- Creo un procedimiento almacenado.. y la query es INVOCARLO
+        CALL extraer_datos_mes_anterior();
+-- Por defecto una tarea se crea en estado PAUSADA: SUSPENDED.
+-- Podemos cambiar su estado:
+ALTER TASK tarea_generar_informe_mensual RESUME; -- En marcha
+-- ALTER TASK tarea_generar_informe_mensual SUSPEND; -- La para
+
+        
+SHOW TASKS;
+    
+SELECT * FROM TABLE(INFORMATION_SCHEMA.TASK_HISTORY());
+-- De esta tabla tenemos la columna STATE: SCHEDULED, SUCCEEDED, FAILED, RUNNING
+-- La primera columa incluye un QUERY_ID,... para que vale eso?
+CALL system$cancel_query('01b20a38-0203-5762-0001-ffc60003bb36');
+SELECT system$cancel_query('01b20a38-0203-5762-0001-ffc60003bb36');
+
+---------
+
+-- Montemos una tarea que se ejecute cada 5 minutos... y que revise si alguna tarea lleva más de 20 minutos en ejecución... Si es así que la mate.
+
+CREATE OR REPLACE TASK cancelar_tareas_pesadas
+    WAREHOUSE = compute_wh
+    SCHEDULE  = '5 minute'
+AS 
+SELECT 
+    query_id,
+    name,
+    system$cancel_query(query_id)
+FROM 
+    TABLE(INFORMATION_SCHEMA.TASK_HISTORY()) tareas,
+    (SELECT DATEADD(MINUTE, -20, current_timestamp()) AS limite ) fecha
+WHERE 
+    --DATEDIFF(MINUTE, query_start_time,  current_timestamp() ) > 2 -- RUINA !
+    --DATEADD(MINUTE, 20,query_start_time ) < current_timestamp()   -- RUINA !
+    query_start_time <  fecha.limite
+    AND tareas.state = 'RUNNING'
+;
+ALTER TASK cancelar_tareas_pesadas RESUME;
+-- En un escenario real, montariamos un procedimiento... ya que:
+-- - Querriamos matar esa query...
+-- - Y Suspender el task que la ha generado
+-- - Y de paso una notificación al log... para que quede registrado que la he cancelado
+
+
+
+
+
+
+
+
+
+
